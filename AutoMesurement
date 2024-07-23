@@ -1,0 +1,105 @@
+# coding:utf-8
+import sys
+import time
+import struct
+import serial
+import datetime
+import csv
+
+if __name__ == "__main__":
+    t1 = time.time()
+
+    file_name = "test_" + datetime.datetime.now().strftime("%Y%m%d_%H%M") + ".csv"
+    date = datetime.datetime.now().strftime("%Y%m%d_%H%M")
+    print(file_name)
+    f = open(file_name, "w")
+    f.write(date+"\n")
+    f.close()
+
+    T = serial.Serial()
+    T.baudrate = 9600  # ArduinoのSerial.beginで指定した値
+    T.timeout = 0.2  # タイムアウトの時間
+    T.port = "COM3"  # Arduinoのポート番号.場合によって違うので注意！！！
+    T.stopbits = 2
+    P = serial.Serial()
+    P.baudrate = 9600  # ArduinoのSerial.beginで指定した値
+    P.timeout = 61  # タイムアウトの時間
+    P.port = "COM4"  # Arduinoのポート番号.場合によって違うので注意！！！
+    P.stopbits = 1
+
+    # 開いてみる
+    try:
+        T.open()
+        print("open " + T.port)
+    except:
+        print("can't open" + T.port)
+        sys.exit(0)
+
+
+    # 開いてみる
+    try:
+        P.open()
+        print("open " + P.port)
+    except:
+        print("can't open" + P.port)
+        sys.exit(0)
+
+    while (1):
+        if P.is_open:
+            cmd = bytearray([0x43, 0x4f, 0x4d, 0x2c, 0x32, 0x0d])
+            # cmd = bytearray([0x53, 0x45, 0x4e, 0x31, 0x00, 0x0d])
+            P.write(cmd)
+            s = P.readline()
+            print(s[0])
+            if (s[0] == 6): print("OK")
+            #print("break")
+            break
+
+    while (P.is_open & T.is_open):
+        #cmd = bytearray([0x05])
+        # ser.write(cmd)
+        p = P.readline()
+        print("----------------------------")
+        print(p[1:13])
+        #print(len(p))
+        #print("while")
+        pa = str(p[1:13])
+        pa = pa.strip("b,'")
+        pa = pa.split("E")
+        pa = float(pa[0])*10**float(pa[1])
+        print(pa)
+
+        cmd = bytearray([0x01, 0x04, 0x03, 0xe8, 0x00, 0x01, 0xb1, 0xba])
+        T.write(cmd)
+        t = T.readline()
+        typ = str(len(t)) + "B"
+        dat = struct.unpack(typ, t)
+
+        therm1 = str(dat[3:4])
+        therm2 = str(dat[4:5])
+        therm1 = int(therm1.strip("(,)"))
+        therm2 = int(therm2.strip("(,)"))
+        therm = therm1 * 16 * 16 + therm2
+        if therm > 32767:
+            therm = therm - 65536
+
+        t2 = time.time()
+        # print(type(s))
+        # print(type(dat))
+        print(t)
+        print(len(t))
+        print(dat)
+        print((t2 - t1) / 60)
+        print(therm)
+        with open(file_name, "a") as f:
+            f.write("{},{},{}\n".format((t2 - t1) / 60, therm, pa))
+        time.sleep(60)
+        # print(dat.index(1))
+        # aaaa = str(dat[4:5])
+        # b = type(therm)
+        # print(b)
+        # print(aaaa)
+
+
+    print("serial connection closed")
+
